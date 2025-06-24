@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>NÚMEROS DISPONIBLES</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      background-color: #0d1b2a;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .subtitulo, .contador, .legend span, input, button {
+      margin: 10px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+      gap: 6px;
+      max-width: 800px;
+      margin: 0 auto 40px;
+    }
+    .number {
+      background-color: #333;
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.3s;
+    }
+    .number:hover {
+      transform: scale(1.1);
+    }
+    .taken { background-color: #e53935; }
+    .available { background-color: #fff; color: #000; }
+    .highlight { outline: 3px solid yellow; }
+    .admin-panel {
+      background-color: #14213d;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 700px;
+      margin: 20px auto;
+      display: none;
+      flex-direction: column;
+    }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      font-size: 0.9rem;
+    }
+    th {
+      background-color: #223;
+    }
+    .legend span {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+    .disponible { background-color: #fff; color: #000; }
+    .pagado { background-color: #e53935; color: #fff; }
+    @media (max-width: 600px) {
+      .grid {
+        grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+      }
+      .admin-panel {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <!-- Logo eliminado -->
+    <h1>NÚMEROS DISPONIBLES</h1>
+    <div class="subtitulo">Rifa potro alazán  sorteo en base a la Lotería Nacional</div>
+  </header>
+
+  <div class="legend">
+    <span class="disponible">Disponible</span>
+    <span class="pagado">Pagado</span>
+  </div>
+
+  <div>
+    <button onclick="filtrar('todos')">Todos</button>
+    <button onclick="filtrar('disponibles')">Disponibles</button>
+    <button onclick="filtrar('apartados')">Pagados</button>
+    <input type="number" id="buscarNumero" placeholder="Buscar número" min="1" max="1000">
+    <button onclick="buscarNumero()">Buscar</button>
+  </div>
+
+  <div class="contador" id="contador">Cargando...</div>
+  <div class="grid" id="numbers"></div>
+
+  <div id="listaParticipantes">
+    <h2>Participantes</h2>
+    <div id="lista"></div>
+  </div>
+
+  <button onclick="mostrarAdmin()">🛠️ Entrar como administrador</button>
+  <div class="admin-panel" id="adminPanel">
+    <h2>Panel de Administrador</h2>
+    <input type="number" id="inputNumero" placeholder="Número" min="1" max="1000">
+    <input type="text" id="inputNombre" placeholder="Nombre">
+    <input type="text" id="inputTelefono" placeholder="Teléfono">
+    <button onclick="agregarParticipante()">Agregar</button>
+    <button onclick="eliminarSeleccionados()">🗑️ Eliminar seleccionados</button>
+    <button onclick="resetearParticipantes()">🧹 Borrar todo</button>
+    <table>
+      <thead>
+        <tr><th>✔</th><th>Número</th><th>Nombre</th><th>Teléfono</th><th>Acción</th></tr>
+      </thead>
+      <tbody id="tablaAdmin"></tbody>
+    </table>
+  </div>
+
+  <script>
+    let participantes = JSON.parse(localStorage.getItem('participantes')) || [];
+    let numerosApartados = participantes.map(p => p.numero);
+
+    function guardarLocal() {
+      localStorage.setItem('participantes', JSON.stringify(participantes));
+    }
+
+    function renderNumeros() {
+      const container = document.getElementById('numbers');
+      container.innerHTML = '';
+      for (let i = 1; i <= 1000; i++) {
+        const div = document.createElement('div');
+        div.textContent = i;
+        div.className = 'number';
+        div.id = `numero-${i}`;
+
+        if (numerosApartados.includes(i)) {
+          div.classList.add('taken');
+        } else {
+          div.classList.add('available');
+        }
+
+        div.onclick = () => {
+          if (numerosApartados.includes(i)) {
+            const destino = document.getElementById(`participante-${i}`);
+            if (destino) {
+              destino.classList.add('highlight');
+              destino.scrollIntoView({ behavior: "smooth" });
+              setTimeout(() => destino.classList.remove('highlight'), 3000);
+            }
+          }
+        };
+
+        container.appendChild(div);
+      }
+      actualizarContador();
+      renderListaParticipantes();
+    }
+
+    function renderListaParticipantes() {
+      participantes.sort((a, b) => a.numero - b.numero);
+      document.getElementById('lista').innerHTML = participantes.map(p =>
+        `<div id="participante-${p.numero}"><strong>${p.numero}</strong> ${p.nombre}</div>`).join('');
+
+      document.getElementById('tablaAdmin').innerHTML = participantes.map(p =>
+        `<tr><td><input type="checkbox" data-numero="${p.numero}"></td>
+         <td>${p.numero}</td><td>${p.nombre}</td><td>${p.telefono}</td>
+         <td><button onclick="eliminarParticipante(${p.numero})">Eliminar</button></td></tr>`).join('');
+    }
+
+    function filtrar(tipo) {
+      const numeros = document.querySelectorAll('.number');
+      let visibles = 0;
+      numeros.forEach(el => {
+        el.style.display = 'block';
+        const esDisponible = el.classList.contains('available');
+        const esApartado = el.classList.contains('taken');
+
+        if (tipo === 'disponibles' && !esDisponible) el.style.display = 'none';
+        else if (tipo === 'apartados' && !esApartado) el.style.display = 'none';
+        else visibles++;
+      });
+      actualizarContador(tipo, visibles);
+    }
+
+    function actualizarContador(filtro = 'todos', visibles = null) {
+      const total = 1000;
+      const apartados = numerosApartados.length;
+      const disponibles = total - apartados;
+      document.getElementById('contador').textContent =
+        filtro === 'todos'
+          ? `Total: ${total} | Disponibles: ${disponibles} | Pagados: ${apartados}`
+          : `Mostrando ${visibles} números (${filtro})`;
+    }
+
+    function agregarParticipante() {
+      const numero = parseInt(document.getElementById('inputNumero').value);
+      const nombre = document.getElementById('inputNombre').value.trim();
+      const telefono = document.getElementById('inputTelefono').value.trim();
+
+      if (!numero || !nombre || !telefono || numero < 1 || numero > 1000 || numerosApartados.includes(numero)) {
+        alert('Datos inválidos o número ocupado.');
+        return;
+      }
+      participantes.push({ numero, nombre, telefono });
+      participantes.sort((a, b) => a.numero - b.numero);
+      numerosApartados = participantes.map(p => p.numero);
+      guardarLocal();
+      renderNumeros();
+      document.getElementById('inputNumero').value = '';
+      document.getElementById('inputNombre').value = '';
+      document.getElementById('inputTelefono').value = '';
+    }
+
+    function eliminarParticipante(numero) {
+      participantes = participantes.filter(p => p.numero !== numero);
+      numerosApartados = participantes.map(p => p.numero);
+      guardarLocal();
+      renderNumeros();
+    }
+
+    function eliminarSeleccionados() {
+      document.querySelectorAll('input[type="checkbox"]:checked').forEach(check => {
+        eliminarParticipante(parseInt(check.dataset.numero));
+      });
+    }
+
+    function buscarNumero() {
+      const numero = parseInt(document.getElementById('buscarNumero').value);
+      document.getElementById('buscarNumero').value = '';
+      if (!numero || numero < 1 || numero > 1000) {
+        alert('Ingresa un número entre 1 y 1000');
+        return;
+      }
+      const div = document.getElementById(`numero-${numero}`);
+      if (div) {
+        div.classList.add('highlight');
+        div.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => div.classList.remove('highlight'), 3000);
+      }
+    }
+
+    function mostrarAdmin() {
+      const pass = prompt("Contraseña:");
+      if (pass === "lostemerarios") {
+        document.getElementById("adminPanel").style.display = "flex";
+        renderListaParticipantes();
+      } else {
+        alert("Contraseña incorrecta.");
+      }
+    }
+
+    function resetearParticipantes() {
+      if (confirm("¿Seguro que quieres borrar todos los participantes?")) {
+        participantes = [];
+        numerosApartados = [];
+        guardarLocal();
+        renderNumeros();
+      }
+    }
+
+    renderNumeros();
+  </script>
+</body>
+</html>
